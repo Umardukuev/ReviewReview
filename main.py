@@ -29,7 +29,7 @@ def load_imdb_data(data_path):
 
     pos_path = os.path.join(data_path, 'pos')
     pos_files = [f for f in os.listdir(pos_path) if f.endswith('.txt')]
-    for i, filename in enumerate(pos_files[:2001]):
+    for i, filename in enumerate(pos_files):
         if i % 1000 == 0:
             print(f'Обработано: {i}/{len(pos_files)} позитивных отзывов')
         with open(os.path.join(pos_path, filename), 'r', encoding='utf-8') as file:
@@ -39,7 +39,7 @@ def load_imdb_data(data_path):
 
     neg_path = os.path.join(data_path, 'neg')
     neg_files = [f for f in os.listdir(neg_path) if f.endswith('.txt')]
-    for i, filename in enumerate(neg_files[:2001]):
+    for i, filename in enumerate(neg_files):
         if i % 1000 == 0:
             print(f'Обработано: {i}/{len(neg_files)} негативных отзывов')
         with open(os.path.join(neg_path, filename), 'r', encoding='utf-8') as file:
@@ -90,7 +90,7 @@ with open('model.pkl', 'wb') as f:
     pickle.dump(model, f)
 
 with open('vectorizer.pkl', 'wb') as f:
-    pickle.dump(model, f)
+    pickle.dump(vectorizer, f)
 
 print('Модель и векторизатор сохранены')
 
