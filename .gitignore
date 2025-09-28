@@ -39,7 +39,7 @@ Thumbs.db
 # Data files
 dataset/
 models/
-*.pkl
+#*.pkl
 *.h5
 *.model
 
