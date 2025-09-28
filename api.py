@@ -1,12 +1,23 @@
 from fastapi import FastAPI, Request
 from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 import pickle
 import re
+import nltk
 from nltk.corpus import stopwords
 
-app = FastAPI(title="Sentiment Analysis API")
+# Скачиваем необходимые данные NLTK при запуске
+try:
+    nltk.data.find('corpora/stopwords')
+except LookupError:
+    nltk.download('stopwords')
+
+app = FastAPI(
+    title="Movie Review Sentiment Analysis",
+    description="API for analyzing sentiment of movie reviews",
+    version="1.0.0"
+)
 
 # Настройка шаблонов
 templates = Jinja2Templates(directory="templates")
@@ -17,11 +28,16 @@ class ReviewRequest(BaseModel):
 
 
 # Загрузка модели и векторизатора
-with open('model.pkl', 'rb') as f:
-    model = pickle.load(f)
+try:
+    with open('model.pkl', 'rb') as f:
+        model = pickle.load(f)
 
-with open('vectorizer.pkl', 'rb') as f:
-    vectorizer = pickle.load(f)
+    with open('vectorizer.pkl', 'rb') as f:
+        vectorizer = pickle.load(f)
+    model_loaded = True
+except FileNotFoundError:
+    model_loaded = False
+    print("Warning: Model files not found!")
 
 
 def preprocess_text(text):
@@ -33,13 +49,16 @@ def preprocess_text(text):
     return ' '.join(words)
 
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
 @app.post("/predict")
 def predict_sentiment(request: ReviewRequest):
+    if not model_loaded:
+        return {"error": "Model not loaded", "sentiment": "unknown", "confidence": 0}
+
     processed_text = preprocess_text(request.text)
     text_vector = vectorizer.transform([processed_text])
 
@@ -57,6 +76,14 @@ def predict_sentiment(request: ReviewRequest):
             'positive': round(probability[1] * 100, 2),
             'negative': round(probability[0] * 100, 2)
         }
+    }
+
+
+@app.get("/health")
+def health_check():
+    return {
+        "status": "healthy",
+        "model_loaded": model_loaded
     }
 
 
