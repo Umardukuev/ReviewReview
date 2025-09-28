@@ -86,56 +86,86 @@
     </div>
 
     <script>
-        async function analyzeSentiment() {
-            const reviewText = document.getElementById('reviewText').value;
-            const resultDiv = document.getElementById('result');
-            const loadingDiv = document.getElementById('loading');
 
-            if (!reviewText.trim()) {
-                alert('Please enter a review text');
-                return;
-            }
+    async function analyzeSentiment() {
+        const reviewText = document.getElementById('reviewText').value;
+        const resultDiv = document.getElementById('result');
+        const loadingDiv = document.getElementById('loading');
 
-            // Show loading
-            loadingDiv.style.display = 'block';
-            resultDiv.style.display = 'none';
-
-            try {
-                const response = await fetch('/predict', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ text: reviewText })
-                });
-
-                const data = await response.json();
-
-                // Update UI with results
-                document.getElementById('sentiment').textContent = data.sentiment;
-                document.getElementById('confidence').textContent = data.confidence;
-                document.getElementById('positiveProb').textContent = data.probabilities.positive;
-                document.getElementById('negativeProb').textContent = data.probabilities.negative;
-
-                // Style based on sentiment
-                resultDiv.className = 'result ' + data.sentiment;
-                resultDiv.style.display = 'block';
-
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Error analyzing sentiment');
-            } finally {
-                loadingDiv.style.display = 'none';
-            }
+        if (!reviewText.trim()) {
+            alert('Please enter a review text');
+            return;
         }
 
-        // Allow Enter key to submit (with Shift+Enter for new line)
-        document.getElementById('reviewText').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                analyzeSentiment();
+        // Show loading
+        loadingDiv.style.display = 'block';
+        resultDiv.style.display = 'none';
+
+        try {
+            console.log('Sending request to:', baseUrl + '/predict');
+            console.log('Request text:', reviewText);
+
+            const response = await fetch(baseUrl + '/predict', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ text: reviewText })
+            });
+
+            console.log('Response status:', response.status);
+            console.log('Response headers:', response.headers);
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-        });
-    </script>
+
+            const data = await response.json();
+            console.log('Full response data:', data);
+
+            // Обработка разных форматов ответа
+            let sentiment, confidence, positiveProb, negativeProb;
+
+            if (data.probabilities) {
+                // Новый формат
+                sentiment = data.sentiment;
+                confidence = data.confidence;
+                positiveProb = data.probabilities.positive;
+                negativeProb = data.probabilities.negative;
+            } else if (data.positive_prob !== undefined) {
+                // Альтернативный формат
+                sentiment = data.sentiment;
+                confidence = data.confidence;
+                positiveProb = data.positive_prob;
+                negativeProb = data.negative_prob;
+            } else {
+                // Минимальный формат
+                sentiment = data.sentiment || 'unknown';
+                confidence = data.confidence || 0;
+                positiveProb = data.positive_prob || 50;
+                negativeProb = data.negative_prob || 50;
+            }
+
+            console.log('Processed data:', { sentiment, confidence, positiveProb, negativeProb });
+
+            // Update UI with results
+            document.getElementById('sentiment').textContent = sentiment;
+            document.getElementById('confidence').textContent = confidence;
+            document.getElementById('positiveProb').textContent = positiveProb;
+            document.getElementById('negativeProb').textContent = negativeProb;
+
+            // Style based on sentiment
+            resultDiv.className = 'result ' + sentiment;
+            resultDiv.style.display = 'block';
+
+        } catch (error) {
+            console.error('Error:', error);
+            console.log('Full error details:', error);
+            alert('Error analyzing sentiment: ' + error.message);
+        } finally {
+            loadingDiv.style.display = 'none';
+        }
+    }
+</script>
 </body>
 </html>
