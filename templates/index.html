@@ -86,26 +86,30 @@
     </div>
 
     <script>
+    const baseUrl = window.location.origin;
+
+    console.log('Base URL detected:', baseUrl);
 
     async function analyzeSentiment() {
         const reviewText = document.getElementById('reviewText').value;
         const resultDiv = document.getElementById('result');
         const loadingDiv = document.getElementById('loading');
 
+        console.log('Starting analysis with text:', reviewText.substring(0, 50) + '...');
+
         if (!reviewText.trim()) {
             alert('Please enter a review text');
             return;
         }
 
-        // Show loading
         loadingDiv.style.display = 'block';
         resultDiv.style.display = 'none';
 
         try {
-            console.log('Sending request to:', baseUrl + '/predict');
-            console.log('Request text:', reviewText);
+            const requestUrl = baseUrl + '/predict';
+            console.log('Sending request to:', requestUrl);
 
-            const response = await fetch(baseUrl + '/predict', {
+            const response = await fetch(requestUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -114,36 +118,37 @@
             });
 
             console.log('Response status:', response.status);
-            console.log('Response headers:', response.headers);
+            console.log('Response OK:', response.ok);
 
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const errorText = await response.text();
+                console.error('Response error text:', errorText);
+                throw new Error(`HTTP error! status: ${response.status}, details: ${errorText}`);
             }
 
             const data = await response.json();
             console.log('Full response data:', data);
 
-            // Обработка разных форматов ответа
             let sentiment, confidence, positiveProb, negativeProb;
 
             if (data.probabilities) {
-                // Новый формат
                 sentiment = data.sentiment;
                 confidence = data.confidence;
                 positiveProb = data.probabilities.positive;
                 negativeProb = data.probabilities.negative;
+                console.log('Using probabilities format');
             } else if (data.positive_prob !== undefined) {
-                // Альтернативный формат
                 sentiment = data.sentiment;
                 confidence = data.confidence;
                 positiveProb = data.positive_prob;
                 negativeProb = data.negative_prob;
+                console.log('Using positive_prob format');
             } else {
-                // Минимальный формат
                 sentiment = data.sentiment || 'unknown';
                 confidence = data.confidence || 0;
                 positiveProb = data.positive_prob || 50;
                 negativeProb = data.negative_prob || 50;
+                console.log('Using fallback format');
             }
 
             console.log('Processed data:', { sentiment, confidence, positiveProb, negativeProb });
@@ -158,6 +163,8 @@
             resultDiv.className = 'result ' + sentiment;
             resultDiv.style.display = 'block';
 
+            console.log('Analysis completed successfully');
+
         } catch (error) {
             console.error('Error:', error);
             console.log('Full error details:', error);
@@ -166,6 +173,16 @@
             loadingDiv.style.display = 'none';
         }
     }
+
+    document.getElementById('reviewText').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            analyzeSentiment();
+        }
+    });
+
+    console.log('Page loaded successfully');
+    console.log('Base URL:', baseUrl);
 </script>
 </body>
 </html>
