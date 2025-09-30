@@ -1,81 +1,82 @@
-from fastapi import FastAPI, Request
-from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
-import pickle
-import re
-import nltk
-from nltk.corpus import stopwords
+import time
 
-# Скачиваем необходимые данные NLTK при запуске
-try:
-    nltk.data.find('corpora/stopwords')
-except LookupError:
-    nltk.download('stopwords')
+from fastapi import FastAPI
+from pydantic import BaseModel
+from typing import Optional
+import pickle
+
+from config import settings
+from utils.text_processor import TextProcessor
+from models.transformer_model import TransformerSentimentAnamyzer
 
 app = FastAPI(
     title="Movie Review Sentiment Analysis",
     description="API for analyzing sentiment of movie reviews",
-    version="1.0.0"
+    version="1.1.0"
 )
-
-# Настройка шаблонов
-templates = Jinja2Templates(directory="templates")
 
 
 class ReviewRequest(BaseModel):
     text: str
+    model_type: Optional[str] = 'transformer'
 
 
-# Загрузка модели и векторизатора
+text_processor = TextProcessor()
+traditional_model = None
+transformer_model = None
+
 try:
-    with open('model.pkl', 'rb') as f:
-        model = pickle.load(f)
-
-    with open('vectorizer.pkl', 'rb') as f:
+    with open(settings.model_path, 'rb') as f:
+        traditional_model = pickle.load(f)
+    with open(settings.vectorizer_path, 'rb') as f:
         vectorizer = pickle.load(f)
-    model_loaded = True
 except FileNotFoundError:
-    model_loaded = False
-    print("Warning: Model files not found!")
+    print("Traditional model file not found!")
 
 
-def preprocess_text(text):
-    text = text.lower()
-    text = re.sub(r'[^a-zA-Z\s]', '', text)
-    stop_words = set(stopwords.words('english'))
-    words = text.split()
-    words = [word for word in words if word not in stop_words]
-    return ' '.join(words)
-
-
-@app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+try:
+    transformer_model = TransformerSentimentAnamyzer()
+except Exception as e:
+    print(f'Transformer model loading failed: {e}')
 
 
 @app.post("/predict")
-def predict_sentiment(request: ReviewRequest):
-    if not model_loaded:
-        return {"error": "Model not loaded", "sentiment": "unknown", "confidence": 0}
+async def predict_sentiment(request: ReviewRequest):
+    start_time = time.time()
 
-    processed_text = preprocess_text(request.text)
-    text_vector = vectorizer.transform([processed_text])
+    if request.model_type == 'transformer' and transformer_model:
+        result = transformer_model.predict(request.text)
+        model_used = 'transformer'
+    elif traditional_model:
+        processed_text = text_processor.preprocess(request.text)
+        text_vector = vectorizer.transform([processed_text])
 
-    prediction = model.predict(text_vector)[0]
-    probability = model.predict_proba(text_vector)[0]
+        prediction = traditional_model.predict(text_vector)[0]
+        probability = traditional_model.predict_proba(text_vector)[0]
 
-    sentiment = "positive" if prediction == 1 else "negative"
-    confidence = probability[1] if prediction == 1 else probability[0]
+        sentiment = "positive" if prediction == 1 else "negative"
+        confidence = probability[1] if prediction == 1 else probability[0]
+
+        result = {
+            'text': request.text,
+            'sentiment': sentiment,
+            'confidence': round(confidence * 100, 2),
+            'probabilities': {
+                'positive': round(probability[1] * 100, 2),
+                'negative': round(probability[0] * 100, 2)
+            }
+        }
+        model_used = 'traditional'
+    else:
+        return {'error' : 'no model available'}
+
+    processing_time = round(time.time() - start_time, 4)
 
     return {
-        'text': request.text,
-        'sentiment': sentiment,
-        'confidence': round(confidence * 100, 2),
-        'probabilities': {
-            'positive': round(probability[1] * 100, 2),
-            'negative': round(probability[0] * 100, 2)
-        }
+        **result,
+        'model_used' : model_used,
+        'processing_time_seconds' : processing_time,
+        'text_preview' : request.text[:100] + '...' if len(request.text) > 100 else request.text
     }
 
 
