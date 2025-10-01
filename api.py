@@ -80,13 +80,6 @@ async def predict_sentiment(request: ReviewRequest):
     }
 
 
-@app.get("/health")
-def health_check():
-    return {
-        "status": "healthy",
-        "model_loaded": model_loaded
-    }
-
 
 if __name__ == "__main__":
     import uvicorn
