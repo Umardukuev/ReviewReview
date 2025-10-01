@@ -7,12 +7,10 @@ import pickle
 
 from config import settings
 from utils.text_processor import TextProcessor
-from models.transformer_model import TransformerSentimentAnamyzer
+from models.transformer_model import TransformerSentimentAnalyzer
 
 app = FastAPI(
-    title="Movie Review Sentiment Analysis",
-    description="API for analyzing sentiment of movie reviews",
-    version="1.1.0"
+    title="Movie Review Sentiment Analysis"
 )
 
 
@@ -35,7 +33,7 @@ except FileNotFoundError:
 
 
 try:
-    transformer_model = TransformerSentimentAnamyzer()
+    transformer_model = TransformerSentimentAnalyzer()
 except Exception as e:
     print(f'Transformer model loading failed: {e}')
 
